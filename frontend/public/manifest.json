@@ -1,0 +1,38 @@
+{
+    "manifest_version": 3,
+    "name": "Where2Liv",
+    "version": "1.1.0",
+    "description": "Calculate monthly energy costs and safety ratings for StreetEasy and Zillow listings",
+    "permissions": [
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://streeteasy.com/*",
+        "https://www.zillow.com/*",
+        "https://zillow.com/*",
+        "http://127.0.0.1:9005/*",
+        "http://127.0.0.1:9006/*",
+        "http://localhost:9006/*",
+        "https://wtrbackend-production.up.railway.app/*",
+        "https://safe-route-phi.vercel.app/*"
+    ],
+    "action": {
+        "default_popup": "index.html",
+        "default_title": "Where2Liv"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://streeteasy.com/*",
+                "https://www.zillow.com/*",
+                "https://zillow.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_end",
+            "all_frames": false
+        }
+    ]
+} 

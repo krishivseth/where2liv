@@ -1,0 +1,28 @@
+# Core Flask dependencies
+Flask==3.0.0
+Flask-CORS==4.0.0
+gunicorn==21.2.0
+
+# Data processing (optimized versions)
+pandas==2.2.2
+numpy==1.26.4
+
+# HTTP and API clients
+requests==2.31.0
+googlemaps==4.10.0
+openai==0.28.1
+google-genai
+python-dotenv
+
+# Utilities
+python-dateutil>=2.8.0
+thefuzz>=0.19
+pytz>=2023.0
+
+# Flask dependencies (auto-installed but specified for clarity)
+Werkzeug>=2.3.0
+MarkupSafe>=2.1.0
+Jinja2>=3.1.0
+itsdangerous>=2.1.0
+click>=8.1.0
+six>=1.16.0

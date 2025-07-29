@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Zillow Scraping</title>
+</head>
+<body>
+    <h1>Test Zillow Content Script</h1>
+    <p>Open console and check for WattsUp messages</p>
+    
+    <!-- Simulate Zillow page structure -->
+    <h1 data-testid="bdp-building-address">2011 Powell St, San Francisco, CA 94133</h1>
+    
+    <div data-testid="bed-bath-sqft-section">
+        <span>1 bed</span>
+        <span>1 bath</span>
+        <span>330 sqft</span>
+    </div>
+    
+    <script src="public/content.js"></script>
+    <script>
+        // Test the content script functions directly
+        setTimeout(() => {
+            console.log('Testing Zillow extraction functions...');
+            
+            // Mock the chrome runtime for testing
+            if (typeof chrome === 'undefined') {
+                window.chrome = {
+                    runtime: {
+                        onMessage: {
+                            addListener: function(callback) {
+                                window.messageListener = callback;
+                            }
+                        }
+                    }
+                };
+            }
+            
+            // Test if functions exist
+            if (typeof extractAddressFromZillow === 'function') {
+                const address = extractAddressFromZillow();
+                console.log('Address:', address);
+            } else {
+                console.error('extractAddressFromZillow function not found');
+            }
+            
+            if (typeof extractRoomCountFromZillow === 'function') {
+                const rooms = extractRoomCountFromZillow();
+                console.log('Rooms:', rooms);
+            } else {
+                console.error('extractRoomCountFromZillow function not found');
+            }
+            
+            if (typeof extractSquareFootageFromZillow === 'function') {
+                const sqft = extractSquareFootageFromZillow();
+                console.log('SqFt:', sqft);
+            } else {
+                console.error('extractSquareFootageFromZillow function not found');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

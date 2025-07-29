@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Route Planner</title>
+</head>
+<body>
+    <h1>Debug Route Planner</h1>
+    <div id="debug-info"></div>
+    <button onclick="testAPI()">Test API</button>
+    <button onclick="testGoogleMaps()">Test Google Maps</button>
+    
+    <script>
+        async function testAPI() {
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML = 'Testing API...';
+            
+            try {
+                const response = await fetch('http://127.0.0.1:61188/api/safe-routes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        origin: "845 United Nations Plaza, New York, NY",
+                        destination: "138 Bruckner Boulevard, Bronx, NY",
+                        mode: 'driving',
+                        alternatives: true
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status}`);
+                }
+
+                const data = await response.json();
+                debugDiv.innerHTML = `
+                    <h3>API Test Successful!</h3>
+                    <p>Routes found: ${data.routes ? data.routes.length : 0}</p>
+                    <p>First route type: ${data.routes && data.routes[0] ? data.routes[0].route_type : 'None'}</p>
+                    <p>First route safety score: ${data.routes && data.routes[0] ? data.routes[0].overall_safety_score : 'None'}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                debugDiv.innerHTML = `<p style="color: red;">API Error: ${error.message}</p>`;
+            }
+        }
+        
+        function testGoogleMaps() {
+            const debugDiv = document.getElementById('debug-info');
+            if (typeof google !== 'undefined' && google.maps) {
+                debugDiv.innerHTML = '<p style="color: green;">Google Maps API loaded successfully!</p>';
+            } else {
+                debugDiv.innerHTML = '<p style="color: red;">Google Maps API not loaded!</p>';
+            }
+        }
+        
+        // Test on page load
+        window.addEventListener('load', () => {
+            document.getElementById('debug-info').innerHTML = 'Page loaded. Click buttons to test.';
+        });
+    </script>
+    
+    <!-- Google Maps API -->
+    <script async defer 
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&libraries=visualization&callback=testGoogleMaps">
+    </script>
+</body>
+</html> 
