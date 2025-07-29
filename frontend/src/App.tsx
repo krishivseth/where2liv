@@ -4,6 +4,7 @@ import { Tag } from "./components/Tag";
 import { SafetyRating } from "./components/SafetyRating";
 import { SafetyDetails } from "./components/SafetyDetails";
 import { RouteInput } from "./components/RouteInput";
+import { ChatInterface } from "./components/ChatInterface";
 import type { SafetyAnalysis } from "./types/safety";
 
 interface EnergyCostData {
@@ -40,6 +41,7 @@ function App() {
   const [showPersonalSafety, setShowPersonalSafety] = useState<boolean>(true);
   const [showNeighborhoodQuality, setShowNeighborhoodQuality] = useState<boolean>(false);
   const [routeLoading, setRouteLoading] = useState<boolean>(false);
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   
   // Use refs to prevent duplicate API calls
   const safetyRequestRef = useRef<AbortController | null>(null);
@@ -336,6 +338,17 @@ function App() {
           </div>
         </div>
         <div className="border-b border-gray-200 mx-[-16px]" />
+        
+        {/* Chat Assistant Button */}
+        <div className="flex justify-center">
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors"
+          >
+            💬 Ask Assistant
+          </button>
+        </div>
+        
         <div className="bg-gray-50 rounded-lg text-xs px-3 py-2 text-gray-700 space-y-1">
           {buildingName && (
             <div className="flex items-center gap-1">
@@ -582,6 +595,14 @@ function App() {
           </div>
         )}
       </div>
+      
+      {/* Chat Interface */}
+      <ChatInterface
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        address={rawAddress || address}
+        buildingName={buildingName}
+      />
     </div>
   );
 }

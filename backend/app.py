@@ -6,6 +6,7 @@ import os
 import socket
 from functools import lru_cache
 import time
+import googlemaps
 
 from data_processor import DataProcessor
 from bill_estimator import BillEstimator
@@ -29,13 +30,14 @@ address_matcher = None
 safety_analyzer = None
 route_analyzer = None
 reviews_analyzer = None
+gmaps = None
 
 # Get the directory of the current script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def initialize_system():
     """Initialize all system components"""
-    global data_processor, bill_estimator, address_matcher, safety_analyzer, route_analyzer, reviews_analyzer
+    global data_processor, bill_estimator, address_matcher, safety_analyzer, route_analyzer, reviews_analyzer, gmaps
     
     try:
         logger.info("Initializing backend system...")
@@ -45,6 +47,9 @@ def initialize_system():
         if not google_api_key:
             logger.error("GOOGLE_API_KEY environment variable not set")
             return False
+        
+        # Initialize Google Maps client
+        gmaps = googlemaps.Client(key=google_api_key)
         
         # Load and process CSV data - now using SF data
         csv_path = os.path.join(BASE_DIR, 'SF_Building_Energy_Filtered_Clean.csv')
@@ -662,6 +667,235 @@ def get_building_reviews():
     except Exception as e:
         logger.error(f"Reviews analysis error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/chat', methods=['POST'])
+def chat_endpoint():
+    """
+    Chat endpoint that uses Gemini to understand user queries and route to appropriate services
+    
+    Expected JSON payload:
+    {
+        "query": "What restaurants are nearby?",
+        "address": "123 Main St, San Francisco",
+        "building_name": "Optional Building Name"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'query' not in data or 'address' not in data:
+            return jsonify({'error': 'Query and address are required'}), 400
+        
+        query = data['query'].lower()
+        address = data['address']
+        building_name = data.get('building_name', None)
+        
+        # Determine query type using Gemini
+        query_analysis = analyze_query_intent(query)
+        
+        if query_analysis['type'] == 'reviews':
+            # Get building reviews
+            result = reviews_analyzer.analyze_building_reviews(address, building_name)
+            return jsonify({
+                'success': True,
+                'response': format_reviews_response(result),
+                'queryType': 'reviews',
+                'data': result
+            })
+            
+        elif query_analysis['type'] == 'nearby':
+            # Search for nearby places
+            place_type = query_analysis.get('place_type', 'restaurant')
+            result = search_nearby_places(address, place_type)
+            return jsonify({
+                'success': True,
+                'response': format_nearby_response(result, place_type),
+                'queryType': 'nearby',
+                'data': result
+            })
+            
+        else:
+            # General query - use Gemini for response
+            response = generate_general_response(query, address)
+            return jsonify({
+                'success': True,
+                'response': response,
+                'queryType': 'general'
+            })
+        
+    except Exception as e:
+        logger.error(f"Chat endpoint error: {e}")
+        return jsonify({'error': 'Chat processing failed'}), 500
+
+def analyze_query_intent(query: str) -> dict:
+    """Use Gemini to analyze query intent"""
+    try:
+        prompt = f"""
+        Analyze this user query and determine the intent:
+        Query: "{query}"
+        
+        Return a JSON response with:
+        - type: "reviews", "nearby", or "general"
+        - place_type: if nearby, specify the type (restaurant, coffee, etc.)
+        - confidence: 0-1 score
+        
+        Examples:
+        - "What restaurants are nearby?" → {{"type": "nearby", "place_type": "restaurant", "confidence": 0.9}}
+        - "Show me reviews for this building" → {{"type": "reviews", "confidence": 0.9}}
+        - "What's the weather like?" → {{"type": "general", "confidence": 0.8}}
+        """
+        
+        # Use existing Gemini client from reviews_analyzer
+        if reviews_analyzer and hasattr(reviews_analyzer, 'client'):
+            response = reviews_analyzer.client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=[{"role": "user", "parts": [{"text": prompt}]}]
+            )
+            
+            # Parse response (simplified)
+            if 'reviews' in query.lower():
+                return {"type": "reviews", "confidence": 0.9}
+            elif any(word in query.lower() for word in ['nearby', 'around', 'close', 'restaurant', 'coffee', 'shop']):
+                place_type = 'restaurant'
+                if 'coffee' in query.lower():
+                    place_type = 'cafe'
+                elif 'shop' in query.lower():
+                    place_type = 'store'
+                return {"type": "nearby", "place_type": place_type, "confidence": 0.8}
+            else:
+                return {"type": "general", "confidence": 0.7}
+        else:
+            # Fallback analysis
+            if 'reviews' in query.lower():
+                return {"type": "reviews", "confidence": 0.9}
+            elif any(word in query.lower() for word in ['nearby', 'around', 'close']):
+                return {"type": "nearby", "place_type": "restaurant", "confidence": 0.8}
+            else:
+                return {"type": "general", "confidence": 0.7}
+                
+    except Exception as e:
+        logger.error(f"Query intent analysis error: {e}")
+        return {"type": "general", "confidence": 0.5}
+
+def search_nearby_places(address: str, place_type: str = 'restaurant') -> dict:
+    """Search for nearby places using Google Places API"""
+    try:
+        # First geocode the address
+        geocode_result = gmaps.geocode(address)
+        if not geocode_result:
+            return {"error": "Could not find location"}
+        
+        location = geocode_result[0]['geometry']['location']
+        
+        # Search for nearby places
+        places_result = gmaps.places_nearby(
+            location=location,
+            radius=1000,  # 1km radius
+            type=place_type
+        )
+        
+        places = []
+        for place in places_result.get('results', [])[:5]:  # Limit to 5 results
+            places.append({
+                'placeId': place['place_id'],
+                'displayName': place['name'],
+                'formattedAddress': place.get('vicinity', ''),
+                'location': place['geometry']['location'],
+                'rating': place.get('rating'),
+                'totalReviews': place.get('user_ratings_total'),
+                'businessStatus': place.get('business_status'),
+                'types': place.get('types', [])
+            })
+        
+        return {
+            'places': places,
+            'searchLocation': location,
+            'placeType': place_type,
+            'totalFound': len(places)
+        }
+        
+    except Exception as e:
+        logger.error(f"Nearby places search error: {e}")
+        return {"error": "Failed to search nearby places"}
+
+def format_reviews_response(result: dict) -> str:
+    """Format reviews analysis into a readable response"""
+    if 'error' in result:
+        return f"Sorry, I couldn't find reviews for this building: {result['error']}"
+    
+    building_info = result.get('building_info', {})
+    ai_analysis = result.get('ai_analysis', {})
+    
+    response = f"📋 **{building_info.get('name', 'Building')} Reviews**\n\n"
+    
+    if ai_analysis.get('summary'):
+        response += f"**Summary:** {ai_analysis['summary']}\n\n"
+    
+    if ai_analysis.get('pros'):
+        response += "**Pros:**\n"
+        for pro in ai_analysis['pros'][:3]:  # Show top 3
+            response += f"• {pro}\n"
+        response += "\n"
+    
+    if ai_analysis.get('cons'):
+        response += "**Cons:**\n"
+        for con in ai_analysis['cons'][:3]:  # Show top 3
+            response += f"• {con}\n"
+        response += "\n"
+    
+    response += f"**Rating:** {building_info.get('rating', 'N/A')}/5 stars ({building_info.get('total_reviews', 0)} reviews)"
+    
+    return response
+
+def format_nearby_response(result: dict, place_type: str) -> str:
+    """Format nearby places into a readable response"""
+    if 'error' in result:
+        return f"Sorry, I couldn't find nearby {place_type}s: {result['error']}"
+    
+    places = result.get('places', [])
+    if not places:
+        return f"No {place_type}s found nearby."
+    
+    response = f"📍 **Nearby {place_type.title()}s**\n\n"
+    
+    for i, place in enumerate(places, 1):
+        rating = place.get('rating', 'N/A')
+        reviews = place.get('totalReviews', 0)
+        response += f"{i}. **{place['displayName']}**\n"
+        response += f"   📍 {place['formattedAddress']}\n"
+        response += f"   ⭐ {rating}/5 ({reviews} reviews)\n\n"
+    
+    return response
+
+def generate_general_response(query: str, address: str) -> str:
+    """Generate a general response using Gemini"""
+    try:
+        prompt = f"""
+        You are a helpful assistant for the Where2Liv app, which helps people find information about places in San Francisco.
+        
+        User query: "{query}"
+        Current address: {address}
+        
+        Provide a helpful response. If the query is about:
+        - Safety: Mention that they can ask about safety ratings
+        - Energy costs: Mention that the app shows electricity estimates
+        - General location info: Be helpful and informative
+        
+        Keep responses concise and friendly.
+        """
+        
+        if reviews_analyzer and hasattr(reviews_analyzer, 'client'):
+            response = reviews_analyzer.client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=[{"role": "user", "parts": [{"text": prompt}]}]
+            )
+            return response.text
+        else:
+            return "I'm here to help with information about this location! You can ask me about nearby places, building reviews, safety ratings, or energy costs."
+            
+    except Exception as e:
+        logger.error(f"General response generation error: {e}")
+        return "I'm here to help! You can ask me about nearby places, building reviews, safety ratings, or energy costs."
 
 @app.errorhandler(404)
 def not_found(error):
