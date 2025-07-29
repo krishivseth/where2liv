@@ -826,24 +826,24 @@ def format_reviews_response(result: dict) -> str:
     building_info = result.get('building_info', {})
     ai_analysis = result.get('ai_analysis', {})
     
-    response = f"📋 **{building_info.get('name', 'Building')} Reviews**\n\n"
+    response = f"📋 <strong>{building_info.get('name', 'Building')} Reviews</strong><br><br>"
     
     if ai_analysis.get('summary'):
-        response += f"**Summary:** {ai_analysis['summary']}\n\n"
+        response += f"<strong>Summary:</strong> {ai_analysis['summary']}<br><br>"
     
     if ai_analysis.get('pros'):
-        response += "**Pros:**\n"
+        response += "<strong>Pros:</strong><br>"
         for pro in ai_analysis['pros'][:3]:  # Show top 3
-            response += f"• {pro}\n"
-        response += "\n"
+            response += f"• {pro}<br>"
+        response += "<br>"
     
     if ai_analysis.get('cons'):
-        response += "**Cons:**\n"
+        response += "<strong>Cons:</strong><br>"
         for con in ai_analysis['cons'][:3]:  # Show top 3
-            response += f"• {con}\n"
-        response += "\n"
+            response += f"• {con}<br>"
+        response += "<br>"
     
-    response += f"**Rating:** {building_info.get('rating', 'N/A')}/5 stars ({building_info.get('total_reviews', 0)} reviews)"
+    response += f"<strong>Rating:</strong> {building_info.get('rating', 'N/A')}/5 stars ({building_info.get('total_reviews', 0)} reviews)"
     
     return response
 
@@ -856,14 +856,14 @@ def format_nearby_response(result: dict, place_type: str) -> str:
     if not places:
         return f"No {place_type}s found nearby."
     
-    response = f"📍 **Nearby {place_type.title()}s**\n\n"
+    response = f"📍 <strong>Nearby {place_type.title()}s</strong><br><br>"
     
     for i, place in enumerate(places, 1):
         rating = place.get('rating', 'N/A')
         reviews = place.get('totalReviews', 0)
-        response += f"{i}. **{place['displayName']}**\n"
-        response += f"   📍 {place['formattedAddress']}\n"
-        response += f"   ⭐ {rating}/5 ({reviews} reviews)\n\n"
+        response += f"{i}. <strong>{place['displayName']}</strong><br>"
+        response += f"   📍 {place['formattedAddress']}<br>"
+        response += f"   ⭐ {rating}/5 ({reviews} reviews)<br><br>"
     
     return response
 

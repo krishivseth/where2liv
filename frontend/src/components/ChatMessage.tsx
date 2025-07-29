@@ -45,7 +45,10 @@ export const ChatMessage = ({ message }: ChatMessageProps): JSX.Element => {
           ? 'bg-blue-500 text-white' 
           : 'bg-gray-100 text-gray-800'
       }`}>
-        <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+        <div 
+          className="text-sm whitespace-pre-wrap"
+          dangerouslySetInnerHTML={{ __html: message.content }}
+        />
         <div className={`text-xs mt-1 ${
           isUser ? 'text-blue-100' : 'text-gray-500'
         }`}>
